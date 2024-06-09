@@ -1,2 +1,2 @@
-# flight-predictor
-Flight predictor basing on real-time data
+# Flight Preditr
+later about it
