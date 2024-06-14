@@ -37,10 +37,14 @@ preprocessor = ColumnTransformer(
     transformers=[
         ('num', StandardScaler(), numeric_features),
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
-        ('callsign', TfidfVectorizer(), callsign_feature)
+        ('callsign', 'passthrough', callsign_feature)  # Zmieniamy na passthrough, żeby działał TfidfVectorizer w pipeline
     ])
 
-pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', model)])
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('vectorizer', TfidfVectorizer()),  # Dodajemy TfidfVectorizer do pipeline
+    ('classifier', SGDClassifier())
+])
 
 global_vocabulary = None
 
@@ -68,7 +72,7 @@ def load_and_preprocess(filename='output.csv'):
         callsign_vectorizer.fit(X['callsign'])
         global_vocabulary = callsign_vectorizer.vocabulary_
         # Update the pipeline with the fitted vectorizer
-        preprocessor.set_params(callsign=callsign_vectorizer)
+        pipeline.named_steps['vectorizer'].vocabulary_ = global_vocabulary
 
     return X, y
 
@@ -81,7 +85,7 @@ def update_model(X, y):
             pipeline.fit(X, y)
             model_trained = True
         else:
-            pipeline.named_steps['classifier'].partial_fit(X, y, classes=np.unique(y))
+            pipeline.named_steps['classifier'].partial_fit(pipeline.named_steps['vectorizer'].transform(X['callsign']), y, classes=np.unique(y))
 
         y_pred = pipeline.predict(X)
         accuracy = accuracy_score(y, y_pred)
@@ -99,7 +103,6 @@ def update_model(X, y):
 
     except Exception as e:
         logger.error(f"Error updating model: {e}", exc_info=True)
-
 
 # --- API Endpoint ---
 @app.route('/predict', methods=['POST'])
