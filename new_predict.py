@@ -36,14 +36,15 @@ callsign_feature = 'callsign'
 preprocessor = ColumnTransformer(
     transformers=[
         ('num', StandardScaler(), numeric_features),
-        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
-        ('callsign', 'passthrough', callsign_feature)  # Zmieniamy na passthrough, żeby działał TfidfVectorizer w pipeline
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
     ])
+
+callsign_vectorizer = TfidfVectorizer()
 
 pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor),
-    ('vectorizer', TfidfVectorizer()),  # Dodajemy TfidfVectorizer do pipeline
-    ('classifier', SGDClassifier())
+    ('vectorizer', 'passthrough'),  # Placeholder for callsign vectorizer
+    ('classifier', model)
 ])
 
 global_vocabulary = None
@@ -56,7 +57,7 @@ def load_and_preprocess(filename='output.csv'):
     for chunk in pd.read_csv(filename, chunksize=chunksize):
         try:
             # Ensure 'callsign' is treated as a string
-            chunk['callsign'] = chunk['callsign'].astype(str)  # Dodaj tę linię
+            chunk['callsign'] = chunk['callsign'].astype(str)
             data.append(chunk)
         except Exception as e:
             logger.error(f"Error processing chunk: {e}", exc_info=True)
@@ -68,11 +69,10 @@ def load_and_preprocess(filename='output.csv'):
 
     # Fit the TfidfVectorizer once on the full dataset
     if global_vocabulary is None:
-        callsign_vectorizer = TfidfVectorizer()
         callsign_vectorizer.fit(X['callsign'])
         global_vocabulary = callsign_vectorizer.vocabulary_
         # Update the pipeline with the fitted vectorizer
-        pipeline.named_steps['vectorizer'].vocabulary_ = global_vocabulary
+        pipeline.set_params(vectorizer=callsign_vectorizer)
 
     return X, y
 
@@ -81,13 +81,21 @@ def update_model(X, y):
     global model_trained
     try:
         logger.info("Updating the model...")
+        # Transform the callsign column
+        X_callsign = callsign_vectorizer.transform(X['callsign'])
+        X_preprocessed = preprocessor.transform(X)
+
+        # Combine the preprocessed features with the transformed callsign features
+        from scipy.sparse import hstack
+        X_combined = hstack([X_preprocessed, X_callsign])
+
         if not model_trained:
-            pipeline.fit(X, y)
+            pipeline.named_steps['classifier'].fit(X_combined, y)
             model_trained = True
         else:
-            pipeline.named_steps['classifier'].partial_fit(pipeline.named_steps['vectorizer'].transform(X['callsign']), y, classes=np.unique(y))
+            pipeline.named_steps['classifier'].partial_fit(X_combined, y, classes=np.unique(y))
 
-        y_pred = pipeline.predict(X)
+        y_pred = pipeline.named_steps['classifier'].predict(X_combined)
         accuracy = accuracy_score(y, y_pred)
         recall = recall_score(y, y_pred, average='macro', zero_division=1)
         f1 = f1_score(y, y_pred, average='macro', zero_division=1)
@@ -126,7 +134,14 @@ def predict():
         # Create DataFrame based on provided features
         X = pd.DataFrame({'callsign': [callsign], 'dep_icao': [dep_icao or df_dep_icao]})
 
-        prediction = pipeline.predict(X)[0]
+        # Transform the callsign column
+        X_callsign = callsign_vectorizer.transform(X['callsign'])
+        X_preprocessed = preprocessor.transform(X)
+
+        # Combine the preprocessed features with the transformed callsign features
+        X_combined = hstack([X_preprocessed, X_callsign])
+
+        prediction = pipeline.named_steps['classifier'].predict(X_combined)[0]
 
         # Create a template string with placeholders
         response_template = '{{ "callsign": "{}", "dep_icao": "{}", "arr_icao": "{}" }}'
@@ -137,7 +152,6 @@ def predict():
         # Using logger log answer
         logger.info(f"Prediction: {response_str}")
 
-        #return jsonify(json.loads(response_str))
         return response_str
 
     except Exception as e:
