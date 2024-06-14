@@ -11,7 +11,7 @@ import threading
 import numpy as np
 import logging
 import json
-from collections import OrderedDict
+from scipy.sparse import hstack
 
 # --- Global Variables ---
 df_combined = None
@@ -81,12 +81,12 @@ def update_model(X, y):
     global model_trained
     try:
         logger.info("Updating the model...")
+        # Fit the preprocessor if it's not fitted
+        X_preprocessed = preprocessor.fit_transform(X)
         # Transform the callsign column
         X_callsign = callsign_vectorizer.transform(X['callsign'])
-        X_preprocessed = preprocessor.transform(X)
 
         # Combine the preprocessed features with the transformed callsign features
-        from scipy.sparse import hstack
         X_combined = hstack([X_preprocessed, X_callsign])
 
         if not model_trained:
