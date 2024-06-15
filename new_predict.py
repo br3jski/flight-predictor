@@ -157,6 +157,33 @@ def predict():
     except Exception as e:
         logger.error(f"Error in /predict endpoint: {e}", exc_info=True)
         return jsonify({"error": "An error occurred during prediction."}), 500
+    
+
+
+# --- API Endpoint for Flights from a Specific Airport ---
+@app.route('/flights_from_airport', methods=['POST'])
+def flights_from_airport():
+    global df_combined
+    data = request.get_json()
+    if not data or 'dep_icao' not in data:
+        return jsonify({"error": "Please provide the dep_icao."}), 400
+
+    try:
+        dep_icao = data['dep_icao']
+
+        # Filter the dataset based on the dep_icao
+        df_filtered = df_combined.loc[df_combined['dep_icao'] == dep_icao, ['callsign', 'arr_icao']]
+        if df_filtered.empty:
+            return jsonify({"error": "No flights found for the provided dep_icao"}), 404
+
+        # Convert the filtered DataFrame to a list of dictionaries
+        flights = df_filtered.to_dict(orient='records')
+
+        return jsonify(flights)
+
+    except Exception as e:
+        logger.error(f"Error in /flights_from_airport endpoint: {e}", exc_info=True)
+        return jsonify({"error": "An error occurred while fetching flights."}), 500
 
 # --- Main Loop to Continuously Update the Model ---
 def continuous_update():
