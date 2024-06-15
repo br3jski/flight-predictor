@@ -176,6 +176,10 @@ def flights_from_airport():
         if df_filtered.empty:
             return jsonify({"error": "No flights found for the provided dep_icao"}), 404
 
+        # Remove duplicates based on the conditions
+        df_filtered = df_filtered.drop_duplicates(subset=['callsign', 'arr_icao'], keep=False)
+        df_filtered = df_filtered.drop_duplicates(subset=['callsign'], keep=True)
+
         # Convert the filtered DataFrame to a list of dictionaries
         flights = df_filtered.to_dict(orient='records')
 
