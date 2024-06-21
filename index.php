@@ -24,7 +24,7 @@
     <div class="container mt-5">
         <h1 class="text-center mb-4">Flight Predictor v0.1</h1>
         <div class="form-container">
-            <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]);?>">
+            <form method="get" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]);?>">
                 <div class="form-group">
                     <label for="callsign">Callsign:</label>
                     <input type="text" class="form-control" id="callsign" name="callsign" required>
@@ -34,19 +34,13 @@
             </form>
 
             <?php
-            if ($_SERVER["REQUEST_METHOD"] == "POST") {
-                $callsign = strtoupper($_POST["callsign"]);
-                $action = $_POST["action"];
+            if ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET["action"])) {
+                $callsign = strtoupper($_GET["callsign"]);
+                $action = $_GET["action"];
 
                 if ($action == "predict") {
-                    $data = array("callsign" => $callsign);
-                    $data_json = json_encode($data);
-
                     $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/predict");
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/predict?callsign=" . urlencode($callsign));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
                     $response = curl_exec($ch);
@@ -93,14 +87,9 @@
                     }
                 } elseif ($action == "list_departures") {
                     $dep_icao = $callsign;
-                    $data = array("dep_icao" => $dep_icao);
-                    $data_json = json_encode($data);
 
                     $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/flights_from_airport");
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/flights_from_airport?dep_icao=" . urlencode($dep_icao));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
                     $response = curl_exec($ch);

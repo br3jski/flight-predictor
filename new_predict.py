@@ -113,7 +113,7 @@ def update_model(X, y):
         logger.error(f"Error updating model: {e}", exc_info=True)
 
 # --- API Endpoint ---
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['GET'])
 def predict():
     global df_combined
     data = request.get_json()
@@ -158,10 +158,37 @@ def predict():
         logger.error(f"Error in /predict endpoint: {e}", exc_info=True)
         return jsonify({"error": "An error occurred during prediction."}), 500
     
+# --- API Endpoint for HTTP request without JSON ---
+@app.route('/predict/<string:callsign>', methods=['GET'])
+def predict_by_callsign(callsign):
+    global df_combined
+    try:
+        df_filtered = df_combined.loc[df_combined['callsign'] == callsign, 'dep_icao']
+        if df_filtered.empty:
+            return jsonify({"error": "Insufficient data"}), 404
+
+        dep_icao = df_filtered.values[0]
+
+        X = pd.DataFrame({'callsign': [callsign], 'dep_icao': [dep_icao]})
+        X_callsign = callsign_vectorizer.transform(X['callsign'])
+        X_preprocessed = preprocessor.transform(X)
+        X_combined = hstack([X_preprocessed, X_callsign])
+
+        prediction = pipeline.named_steps['classifier'].predict(X_combined)[0]
+
+        response_dict = {"callsign": callsign, "dep_icao": dep_icao, "arr_icao": prediction}
+        logger.info(f"Prediction: {response_dict}")
+
+        return jsonify(response_dict)
+
+    except Exception as e:
+        logger.error(f"Error in /predict/<string:callsign> endpoint: {e}", exc_info=True)
+        return jsonify({"error": "An error occurred during prediction."}), 500
+    
 
 
 # --- API Endpoint for Flights from a Specific Airport ---
-@app.route('/flights_from_airport', methods=['POST'])
+@app.route('/flights_from_airport', methods=['GET'])
 def flights_from_airport():
     global df_combined
     data = request.get_json()
