@@ -39,8 +39,14 @@
                 $action = $_GET["action"];
 
                 if ($action == "predict") {
+                    $data = array("callsign" => $callsign);
+                    $data_json = json_encode($data);
+
                     $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/predict?callsign=" . urlencode($callsign));
+                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/predict");
+                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
                     $response = curl_exec($ch);
@@ -87,9 +93,14 @@
                     }
                 } elseif ($action == "list_departures") {
                     $dep_icao = $callsign;
+                    $data = array("dep_icao" => $dep_icao);
+                    $data_json = json_encode($data);
 
                     $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/flights_from_airport?dep_icao=" . urlencode($dep_icao));
+                    curl_setopt($ch, CURLOPT_URL, "http://api.cloudvance.eu:5000/flights_from_airport");
+                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
                     $response = curl_exec($ch);
